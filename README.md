@@ -1,78 +1,79 @@
 # Notes Generator
 
-A small Flask app that converts an input PDF into a lined, handwritten-style PDF (extracts text and renders it using a handwriting font onto ruled pages).
+A small Flask app that converts an input PDF into a lined, handwritten-style PDF. The app extracts text from an uploaded PDF and reflows it onto ruled pages using a handwriting font (if provided).
 
 This README explains how to install dependencies and run the project locally on Windows (PowerShell).
 
-## What this project does
-- Accepts a PDF upload via the web UI.
-- Extracts text from the PDF and reflows it into a lined page layout using a handwriting font.
-- Returns a generated PDF download (handwritten-styled, lined pages).
-
-Important: the app currently does NOT create Word documents. It always produces a PDF file.
+## Quick summary
+- Start the Flask server, open http://localhost:5000 in your browser, upload a PDF, and download the generated handwritten-styled PDF.
 
 ## Prerequisites
-- Python 3.9+ (tested on CPython)
+- Python 3.9+ (CPython recommended)
 - pip
-- (Optional) A virtual environment is strongly recommended
+- (Optional but recommended) virtual environment
 
-## Files of interest
-- `app.py` — Flask web application and upload route.
-- `format_notes.py` — core logic: extracts text and generates the lined/handwritten PDF.
-- `templates/index.html` — simple front-end for uploading PDFs.
-- `requirements.txt` — Python dependencies.
-- `Kalam-Regular.ttf` (optional) — a handwriting TTF. If present in the project folder it will be used; otherwise the code falls back to a built-in font.
+## Project files
+- `app.py` — Flask web app and upload route.
+- `format_notes.py` — core logic: extracts text and generates the lined/handwriting-styled PDF.
+- `templates/index.html` — frontend upload UI.
+- `requirements.txt` — Python dependencies (Flask, PyMuPDF, reportlab, Pillow).
+- `Kalam-Regular.ttf` (optional) — a handwriting TTF. If present in the project root it will be used; otherwise the code falls back to a built-in font.
 
-## Install dependencies (PowerShell)
-Open PowerShell in the project folder (for example `C:\Users\karti\Desktop\notes generator`) and run:
+## Install (PowerShell)
+Open PowerShell in the project folder (for example `C:\Users\karti\Desktop\notes-generator`) and run:
 
 ```powershell
-# optional: create and activate a venv
+# optional: create and activate a venv (recommended)
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
 # install dependencies
-pip install -r "C:\Users\karti\Desktop\notes generator\requirements.txt"
+pip install -r requirements.txt
 ```
 
-Note: If you created a virtual environment, make sure to activate it each time before running the app.
+If you skip the venv, install directly into your system Python environment.
 
-## Running the app (PowerShell)
-From the project directory:
+## Run the app (PowerShell)
+From the project directory run:
 
 ```powershell
-python "C:\Users\karti\Desktop\notes generator\app.py"
+python app.py
 ```
 
-By default the Flask development server will start at `http://localhost:5000`.
+By default the Flask development server starts on http://localhost:5000. Open that URL in your browser to use the upload UI.
 
-Open that address in your browser and use the upload control to select a PDF, then click "Upload & Convert". The server will respond with a generated PDF for download.
+## How it works (short)
+- The web UI (`templates/index.html`) posts the selected PDF to `/upload`.
+- `app.py` saves the uploaded PDF to a temp file and calls `generate_formatted_notes(input_path, output_path)` from `format_notes.py`.
+- `format_notes.py` extracts text using PyMuPDF and writes a lined, handwriting-styled PDF using ReportLab.
 
 ## Configuration notes
-- `app.secret_key` in `app.py`: change to a secure random key before deploying publicly.
-- `UPLOAD_FOLDER` in `app.py` uses the OS temp directory by default. You can change it to a persistent folder if you want to keep outputs.
-- `MAX_CONTENT_LENGTH` in `app.py` limits the upload size (default 50 MB). Adjust as needed.
-- Handwriting font: place a TTF file (e.g., `Kalam-Regular.ttf`) in the project folder; the code will register and use it automatically. If not present the app falls back to a built-in font and the output will still work but will not look like handwriting.
-
-## Behavior and fidelity
-This tool extracts the plain text from the PDF and reflows it into the handwriting font on ruled pages. That means:
-- Text content is preserved, but original visual styles (bold/italic, bullet indentation, exact font faces) are not guaranteed to be exactly retained in the generated PDF.
-- If you need an exact visual replica of the input PDF (bit-for-bit), we can instead render each page as an image and overlay lined paper; that option is available but creates a non-selectable (image) PDF.
-
-If your requirement is to exactly preserve bold, bullets and sizes in the output PDF as selectable text, we can implement a more advanced pipeline (parsing font spans and mapping them to ReportLab styling). Tell me if you want that and I will add it.
+- Secret key: change `app.secret_key` in `app.py` before exposing the app publicly.
+- Upload folder: `app.config['UPLOAD_FOLDER']` defaults to the OS temp folder (safe for development). Change it to a persistent folder if you want to keep generated files.
+- Max upload size: `MAX_CONTENT_LENGTH` is set to 50 MB by default in `app.py`.
+- Handwriting font: place a TTF (e.g. `Kalam-Regular.ttf`) in the project root. `format_notes.py` looks for `Kalam-Regular.ttf` and uses it if present; otherwise it falls back to a built-in font.
 
 ## Troubleshooting
-- If uploads fail with an error about missing modules, re-run the pip install step and verify the active Python interpreter (especially inside a virtualenv).
-- If the server reports a permissions error writing to the temp folder, set `UPLOAD_FOLDER` in `app.py` to a folder where the Flask process has write permissions.
-- If the handwriting font doesn't show, ensure the TTF file name in the project root matches the `FONT_FILE` variable in `format_notes.py` or update the code to point to your font file.
+- Module import errors: activate your virtualenv (if used) and reinstall with `pip install -r requirements.txt`.
+- Permission errors writing files: set `UPLOAD_FOLDER` to a directory where the running user has write permission.
+- If resulting PDF is not in a handwriting style, ensure your `.ttf` font file is present and named `Kalam-Regular.ttf`, or update `FONT_FILE` in `format_notes.py`.
+
+## Notes on fidelity and limitations
+- This tool extracts selectable text from the input PDF and reflows it into a handwritten-style PDF. That means layout, exact font sizes, and some styling (bold/italic/indentation) may be lost during conversion.
+- For scanned PDFs (images), text extraction will produce empty text. To support scanned PDFs you can add an OCR step (Tesseract). I can help add that on request.
+
+## Next steps (optional improvements)
+- Add automatic cleanup of generated files after download to avoid disk growth.
+- Add an OCR fallback for scanned PDFs.
+- Add support to preserve richer formatting (bold, italics, lists) when reflowing text.
 
 ## License
-This project is provided as-is for personal use. Add a license file if you plan to redistribute.
-
-## Next steps (optional)
-- Add a background cleanup job to remove temporary generated files after download.
-- Add an OCR fallback (Tesseract) for scanned PDFs with no selectable text.
-- Implement an alternate pipeline that preserves original PDF styles in a regenerated, selectable PDF.
+Add a license file if you plan to redistribute this project.
 
 ---
-If you want, I can now run a quick syntax check for the repository and/or walk you through testing with a sample PDF.
+
+If you'd like, I can also:
+- Run a quick syntax check or start the server here and confirm routes work locally.
+- Add a sample PDF to `examples/` and a short integration test that uploads and verifies a generated PDF.
+
+If you want me to apply one of those, tell me which and I'll proceed.
