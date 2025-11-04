@@ -1,0 +1,132 @@
+<!-- templates/index.html -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Notion → Handwritten Notes</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; background:#f6f9fc; color:#111; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
+    .card { background:white; border-radius:12px; box-shadow: 0 8px 30px rgba(13,38,76,0.08); padding:24px; width:520px; }
+    h1 { margin:0 0 8px 0; font-size:20px; }
+    p { color:#556; margin: 0 0 20px 0; }
+    .drop { border:2px dashed #d7e2f0; padding:28px; border-radius:8px; text-align:center; cursor:pointer; background: linear-gradient(180deg, rgba(250,252,255,1), rgba(245,249,255,1)); }
+    input[type=file] { display:none; }
+    button { margin-top:14px; background:#2563eb; color:white; padding:10px 14px; border:none; border-radius:8px; cursor:pointer; }
+    .small { font-size:13px; color:#6b7280; margin-top:8px; }
+    .hidden { display:none; }
+    .progress { margin-top: 12px; height: 8px; background:#eee; border-radius: 8px; overflow:hidden; }
+    .progress > div { height:100%; width:0%; background:#2563eb; transition: width 0.3s; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Convert Notion PDF → Handwritten Notes</h1>
+    <p>Upload a Notion-exported PDF. The server will generate an aesthetic, lined, handwritten-style PDF you can download.</p>
+
+    <label class="drop" id="dropArea">
+      <div id="dropText">Drag & drop a PDF here or click to choose</div>
+      <input id="fileInput" type="file" accept="application/pdf" />
+    </label>
+
+    <div class="small">Only PDF files. Max ~50 MB (server limit)</div>
+
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button id="uploadBtn" disabled>Upload & Convert</button>
+      <div id="status" class="small"></div>
+    </div>
+
+    <div class="progress hidden" id="prog"><div></div></div>
+  </div>
+
+  <script>
+    const dropArea = document.getElementById('dropArea');
+    const fileInput = document.getElementById('fileInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const status = document.getElementById('status');
+    const prog = document.getElementById('prog');
+    let selectedFile = null;
+
+    dropArea.addEventListener('click', () => fileInput.click());
+
+    dropArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropArea.style.borderColor = '#93c5fd';
+    });
+
+    dropArea.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dropArea.style.borderColor = '#d7e2f0';
+    });
+
+    dropArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropArea.style.borderColor = '#d7e2f0';
+      const f = e.dataTransfer.files[0];
+      handleFile(f);
+    });
+
+    fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+    function handleFile(f) {
+      if (!f) return;
+      if (f.type !== 'application/pdf') {
+        alert('Please upload a PDF file.');
+        return;
+      }
+      selectedFile = f;
+      uploadBtn.disabled = false;
+      document.getElementById('dropText').innerText = f.name;
+      status.innerText = `${(f.size/1024/1024).toFixed(2)} MB selected`;
+    }
+
+    uploadBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      uploadBtn.disabled = true;
+      status.innerText = "Uploading...";
+      prog.classList.remove('hidden');
+      prog.firstElementChild.style.width = '10%';
+
+      const form = new FormData();
+      form.append('file', selectedFile);
+
+      try {
+        // Use fetch & stream the response as blob to trigger download
+        const resp = await fetch('/upload', { method: 'POST', body: form });
+        if (!resp.ok) {
+          const text = await resp.text();
+          alert('Upload failed: ' + text);
+          status.innerText = "Upload failed";
+          uploadBtn.disabled = false;
+          prog.classList.add('hidden');
+          return;
+        }
+
+        // get filename from response headers (Flask send_file sets attachment)
+        const blob = await resp.blob();
+        const filename = resp.headers.get('Content-Disposition')?.split('filename=')?.pop() || 'formatted.pdf';
+
+        // trigger browser download
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename.replace(/"/g,'');
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+
+        status.innerText = "Done — download should start";
+        prog.firstElementChild.style.width = '100%';
+      } catch (err) {
+        console.error(err);
+        alert('Error during upload: ' + err);
+        status.innerText = "Error";
+      } finally {
+        uploadBtn.disabled = false;
+        setTimeout(() => { prog.classList.add('hidden'); prog.firstElementChild.style.width = '0%'; }, 1200);
+      }
+    });
+  </script>
+</body>
+</html>
